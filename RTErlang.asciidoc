@@ -1,0 +1,88 @@
+# Bringing Hard Real-Time to Erlang
+
+## Evaluation of current situation: Use-cases of Erlang
+
+* What is hard RT: Never miss a deadline
+* Evaluate Soft RT System Performance
+* No deadline guarantees
+
+### Memory Management
+
+* Carriers are 
+## What could Hard RT mean in the Erlang world
+
+* _Some_ processes have RT constraints, some don't
+* In general RT OS required
+
+### Message Passing
+
+* IPC solely via MP
+* Messages could go over network to other node -> RT Networking (advanced topic)
+* Mailbox -> Process -> maybe send()
+* Messages between processes: RT to RT has RT constr, RT to nonRT noconstr, nonRT to RT maybe
+* External world must be assumed as RT (e.g. a bus message arrives). If a RT process receives from the socket, the socket is RT to
+
+### Processes
+
+* Have deadlines
+* Don't have control over their inbox => Possibilities:
+	1. Assume maximum message rate (maybe selective regarding the message content) and silently drop messages arriving in shorter intervals as MMR on the VM-side/One "message filtering layer" above
+	1. Tell the sender to STFU -> send kill signal exit(Pid, kill)
+	1. Combination of strategies
+* Deadlines can be missed 
+	* Who has the deciding stopwatch?
+		1. Some kind of supervisor
+		1. Erlang VM?
+	* Reaction strategies:
+		1. Ignore *BUT:* Severe hazard is imminent
+		1. Possibly means our assumptions regarding the system performance/behavior are wrong
+		1. Means that the internal state is unforseen (e.g. a queue silently grows and grows)
+		1. KILL by supervisor/stopwatch
+
+### Garbage Collection
+
+* Sources:
+	* https://www.erlang-solutions.com/blog/erlang-19-0-garbage-collector.html
+	* 
+* Per Process
+* After 2000 Reductions (~function calls)
+* "copying semi space generational GC"
+	* From space and To space
+	* Collector scans root-set recursively (follows pointers to from space)
+	* generational: very fresh data above the watermark, everything else is moved to old heap
+	* full sweep: GC everything when high watermark is larger than free space in old heap, or with option fullsweep after (number of young GCs)
+	* since OTP19: young heap can have heap-fragments: references to stuff outside it, which get copied when they are needed by the process
+* Heap grows
+	* Fibonacci, from 1M word on in 20% increments
+	* After fullsweep 75% occupied
+	* no space left
+* Heap shrinks
+	* after young collection live objects 25% and heap is "big"
+	* fullsweep if total amount of live objects is less than 25% of heap
+* Literals
+* Binary = Terms larger than 64 Bytes
+	* Reference counter on process heap
+	* tracked in off heap virtual binary heap to trigger GC
+* Message
+	* Queue can be set as: `off_heap`, `on_heap`, `mixed` per process or globally
+	* Sending process:
+		1. `size(message)`
+		1. 
+### Scheduler
+
+
+
+
+* Evaluate/compare performance on Hard RT System (i.e. Grisp)
+* Enforce GC after each run, see how it impacts runtime
+
+* Task: Deadline Assumed Message Rate
+
+https://www.youtube.com/watch?v=tBAM_N9qPno
+
+
+## Tasks
+
+* Formulate Realtime Requirements in Erlang (Syntax)
+
+
