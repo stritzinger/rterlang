@@ -3,12 +3,11 @@
 == Evaluation of current situation: Use-cases of Erlang ==
 
 * What is hard RT: Never miss a deadline
-* Evaluate Soft RT System Performance
 * No deadline guarantees
 
 === Garbage Collection ===
 
-Source https://www.erlang-solutions.com/blog/erlang-19-0-garbage-collector.html[Erlang Solutions Blog: Erlang 19.0 Garbage Collector]
+Source https://www.erlang-solutions.com/yxblog/erlang-19-0-garbage-collector.html[Erlang Solutions Blog: Erlang 19.0 Garbage Collector]
 
 * Per Process
 * After 2000 Reductions (~function calls)
@@ -50,14 +49,12 @@ Source: https://www.youtube.com/watch?v=YuPaX11vZyI[Lukas Larsson - Memory Alloc
 * Carrier alloc:
 	** mseg alloc: caches freed carriers
 	** sys alloc: used for main carrier alloc
+* See http://erlang.org/doc/man/erts_alloc.html[`erts_alloc`]
 
 === Message Passing ===
 
 * IPC solely via MP
-* Messages could go over network to other node -> RT Networking (advanced topic)
-* Mailbox -> Process -> maybe send()
-* Messages between processes: RT to RT has RT constr, RT to nonRT noconstr, nonRT to RT maybe
-* External world must be assumed as RT (e.g. a bus message arrives). If a RT process receives from the socket, the socket is RT to
+* Messages could go over network to other node
 
 === Scheduler ===
 
@@ -168,21 +165,32 @@ Source: https://www.youtube.com/watch?v=tBAM_N9qPno[Lukas Larsson - Understandin
 			. Receiver?
 			. Sender?
 			. Both?
+* http://erlang.org/doc/man/erlang.html#process_flag-2[`erlang:process_flag/2`]
+	** `min_heap_size`
+	**`min_bin_vheap_size`
+	** `max_heap_size`: Size (`total_heap_size`) check only during GC, `kill` flag and `error_logger` can be set. "The heap size of a process is quite hard to predict, especially the amount of memory that is used during the garbage collection. When contemplating using this option, it is recommended to first run it in production with kill set to false and inspect the error_logger reports to see what the normal peak sizes of the processes in the system is and then tune the value accordingly."
+	** `message_queue_data`: `off_heap` `on_heap`. "When changing this flag messages will be moved. This work has been initiated but not completed when this function call returns."
+	** `priority`: `low`, `normal`, `high`, `max`. "There is no automatic mechanism for avoiding priority inversion, such as priority inheritance or priority ceilings. When using priorities, take this into account and handle such scenarios by yourself."
 
+=== Message Passing ===
+
+* Distribution -> RT Networking (advanced topic)
+* Mailbox -> Process -> maybe send()
+* Messages between processes: RT to RT has RT constr, RT to nonRT noconstr, nonRT to RT noconstr
+* External world must be assumed as RT (e.g. a bus message arrives). If a RT process receives from the socket, the socket is RT to
 
 === Scheduler ===
 
-
+* Standard scheduler is round-robin, bpriority, work-stealing
 
 === Garbace Collector ===
 
-
-* Evaluate/compare performance on Hard RT System (i.e. Grisp)
-* Enforce GC after each run, see how it impacts runtime
-
-
+* Run GC after each RT task. Full sweep necessary?
 
 
 === Tasks ===
 
 * Formulate Realtime Requirements in Erlang (Syntax)
+* Think about a benchmark application, having soft RT tasks, and maybe a 1 or a few simple processes with strict deadlines, maybe software PWM?
+	. bring it to its limits and let RT tasks miss deadlines
+	. create supervisor or other mechanisms to detect deadline misses in software
