@@ -17,7 +17,7 @@
 
 static Pin pins[] =
   {
-    {PIO_PC12, PIOC, ID_PIOC, PIO_INPUT, PIO_DEFAULT},    /* 0: gpio1 pin1 */
+    {PIO_PC12, PIOC, ID_PIOC, PIO_INPUT, PIO_IT_FALL_EDGE},    /* 0: gpio1 pin1 */
     {PIO_PC13, PIOC, ID_PIOC, PIO_INPUT, PIO_DEFAULT},    /* 1: gpio1 pin2 */
     {PIO_PA21, PIOA, ID_PIOA, PIO_INPUT, PIO_DEFAULT},    /* 2: gpio1 pin3 */
     {PIO_PD30, PIOD, ID_PIOD, PIO_INPUT, PIO_DEFAULT},    /* 3: gpio1 pin4 */
