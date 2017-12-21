@@ -1,0 +1,75 @@
+= First Approach: Real-Time without Modifications to the Erlang Runtime System =
+
+We create a Meta-Scheduling Algorithm and create a Test Environment
+
+*Drawback of this approach: ERTS has no real control over processes. We must hope that nothing hangs-up. Preemption is not possible.* <- verify that statement
+
+== Meta-Scheduling Algorithm ==
+
+Possible Strategies: *FIFO*, *Fixed Priorities*, *EDF* (could be done with simple selective receive)
+
+Disable hibernation
+
+Basic Erlang Algorithm for *one* RT process
+
+. Process lingering in `receive` with _HIGH_ priority
+. When message received change own priority to _MAX_
+. issue `gen_server:cast(ServerRef, Request, Timeout)` to see if deadline is missed
+. Handle Message
+. Send priority to _HIGH_ again and `loop()`
+
+Basic Erlang Algorithm for *multiple* RT processes
+
+. Multiple Processes lingering in `receive` with _HIGH_ priority
+. All messages go to a single "supervisor", receives and implements Scheduling algorithms by re-ordering messages, communicating with supervised processes (e.g. knowing its deadlines, maximum runtime).
+. Maybe send `kill` if deadline is over?
+
+*Problem is we cannot achieve real preemption that way.*
+
+== Test Environment ==
+
+* Create some (dynamic, configurable) load with regular HTTP Requests to -`cowboy`- `elli` Server
+* Setup consisting of two GRiSP Boards
+* Oscilloscope to see what's going on (possibly digital one, just sample "communication"?)
+* Use https://github.com/basho/riak_sysmon[`riak_sysmon`]
+
+== General Measurement Process ==
+
+On Eval-Board:
+
+. Pull pin high
+
+On SUT-Board:
+
+. Detect Signal with IRR, send message to process
+. Do computations
+. Pull another pin high
+
+On Eval-Board:
+
+. Measure and store timespan
+. Wait _some_ time
+
+*REPEAT*
+
+== First Steps ==
+
+* Get Familiar with C-Drivers
+* Write interrupt handler driver
+
+== Further Tasks ==
+
+* Put more computations and acutal doing stuff on the SUT
+* Set sufficient big GC settings
+* How to measure RTEMS load, ERTS load. Possible `RTEMS-Erlang` driver?
+* Collect `sysinfo`
+* Check how well logging works / card speed; Or log over `BERT`
+* Automate everything with `ct`
+* Test what happens when process with _MAX_ priority hangs-up or takes long
+
+=== `RTEMS-ERLANG` ===
+
+* System load
+* Reboot/Reset
+* WiFi
+* Set time? (possibly coming from NTP)

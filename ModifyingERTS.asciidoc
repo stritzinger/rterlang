@@ -1,0 +1,8 @@
+= Modifying ERTS =
+
+*Objective:* Expanding Erlang Scheduler
+
+== Process Properties ==
+
+* Maximum Message Rate
+* Deadline

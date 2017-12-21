@@ -1,0 +1,22 @@
+= Remote Deploy for GRiSP =
+
+From `release_handler` documentation:
+
+   The  release  handler  process  is a locally registered process on each
+   node. When a release is installed in a distributed system, the  release
+   handler  on  each  node must be called. The release installation can be
+   synchronized between nodes. From an operator view, it can  be  unsatis‐
+   factory to specify each node. The aim is to install one release package
+   in the system, no matter how many nodes there are.  It  is  recommended
+   that  software  management functions are written that take care of this
+   problem. Such a function can have knowledge of the system architecture,
+   so  it can contact each individual release handler to install the pack‐
+   age.
+
+=== TODO ===
+
+Is there any software available which simplifies this?
+
+. `sendfile`
+. Talk to remote `relase_handler` via `rpc`
+. Integrate into `rebar3_grisp` or create another `rebar3` plugin
