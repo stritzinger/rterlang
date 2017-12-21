@@ -1,6 +1,6 @@
 % @doc mygrispapp public API.
 % @end
--module(mygrispapp).
+-module(grispapp).
 
 -behavior(application).
 
@@ -12,6 +12,6 @@
 
 start(_Type, _Args) -> 
 	{ok, _Pid} = elli:start_link([{callback, elli_minimal_callback}, {port, 3000}]),
-	mygrispapp_sup:start_link().
+	grispapp_sup:start_link().
 
 stop(_State) -> ok.

@@ -1,8 +1,8 @@
-{application, mygrispapp, [
+{application, grispapp, [
     {description, "A GRiSP application"},
     {vsn, "0.1.0"},
     {registered, []},
-    {mod, {mygrispapp, []}},
+    {mod, {grispapp, []}},
     {applications, [
         kernel,
         stdlib,

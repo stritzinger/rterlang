@@ -1,6 +1,6 @@
 % @doc mygrispapp top level supervisor.
 % @end
--module(mygrispapp_sup).
+-module(grispapp_sup).
 
 -behavior(supervisor).
 
