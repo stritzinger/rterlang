@@ -55,7 +55,7 @@ ErlDrvData grisp_ir_start(ErlDrvPort port, char* command);
 void grisp_ir_stop(ErlDrvData data);
 void grisp_ir_ready_input(ErlDrvData data, ErlDrvEvent event);
 void grisp_ir_stop_select(ErlDrvEvent event, void* reserved);
-rtems_task pin_trigger(rtems_task_argument arg);
+rtems_task grisp_ir_pin_trigger(rtems_task_argument arg);
 void grisp_ir_handle(const Pin *pPIn, void *arg);
 
 ErlDrvEntry grisp_ir_driver_entry = {
@@ -100,21 +100,21 @@ ErlDrvData grisp_ir_start(ErlDrvPort port, char *command)
     //PIO_SysInitializeInterrupts(); //priority 10?
     PIO_ConfigureIt(triggerpin,
     	&grisp_ir_handle, data); // *arg is unused
-    PIO_EnableIt(triggerpin);
     
     
     /* Start task to receive interrupts */
-    taskname = rtems_build_name('G','R','I','R');
+    taskname = rtems_build_name('G','I','P','T');
     if (rtems_task_create(taskname, 8, 1024*8, RTEMS_INTERRUPT_LEVEL(0), RTEMS_GLOBAL, &(data->tid)) != RTEMS_SUCCESSFUL)
         return ERL_DRV_ERROR_GENERAL;
-    if (rtems_task_start(data->tid, &pin_trigger, (rtems_task_argument) data)  != RTEMS_SUCCESSFUL)
+    if (rtems_task_start(data->tid, &grisp_ir_pin_trigger, (rtems_task_argument) data)  != RTEMS_SUCCESSFUL)
         return ERL_DRV_ERROR_GENERAL;
     
     driver_select(data->port, (ErlDrvEvent)data->fd[0], ERL_DRV_READ, 1);
+    PIO_EnableIt(triggerpin);
     return (ErlDrvData) data;
 }
 
-rtems_task pin_trigger(rtems_task_argument arg){
+rtems_task grisp_ir_pin_trigger(rtems_task_argument arg){
     struct grisp_ir_data *data = (struct grisp_ir_data *) arg;
     rtems_event_set eset;
     char payload = 1;
