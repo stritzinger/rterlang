@@ -1,0 +1,36 @@
+-
+
+# scheduler gen_server with MAX priority
+* mayrun(deadline): can taskx run? yes: run, no: add to waitlist
+* done: taskx is done; run_next
+* run_next -> if a deadline missed cast overload
+
+
+WORKS ONLY WITH 1 SCHEDULER THREAD BC of Workstealing:
+      Other cores / schedulers only look for work when they are idle, multiple MAX processes don't run in parallel
+
+rttask
+via (callbacks)
+prio max
+receive:
+  {okrun, msg} -> prio MAX, run_callback()
+  overload -> 
+  msg -> schedmayrun, deadline, msg)
+
+init: MAX
+callbacks
+Msg when State=idle
+ok_run when State=waiting => HIGH
+overload when State=waiting
+
+IDEA: Create "Proxy Module" -> rename callbacks from gen_server, add some functionality -> known callbacks handle_overload, holdback/forward msg
+
+Plain Server?!? -> We need some kind of "protocol" anyway. Easiest with gen_server behaviour
+
+THEN: Move everything to the core of gen_server
+
+
+run_callback() ->
+.... if dl miss -> restart
+prio_HIGH,
+Sched ! done.

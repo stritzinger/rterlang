@@ -176,6 +176,8 @@ Source: https://www.youtube.com/watch?v=tBAM_N9qPno[Lukas Larsson - Understandin
 	** `message_queue_data`: `off_heap` or `on_heap`. "When changing this flag messages will be moved. This work has been initiated but not completed when this function call returns."
 	** `priority`: `low`, `normal`, `high`, `max`. "There is no automatic mechanism for avoiding priority inversion, such as priority inheritance or priority ceilings. When using priorities, take this into account and handle such scenarios by yourself."
 
+> [22:57:26] <okeuday_bak> nextloop: supposedly {scheduler, N} is an undocumented option to the spawn options, but that may not still be there, you would have to read the source code, it is best to not do that
+
 === Message Passing ===
 
 * Distribution -> RT Networking (advanced topic)

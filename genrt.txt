@@ -1,0 +1,17 @@
+loop: handle_rt: ask sched for "mayrun" etc...
+
+states: idle, waiting
+WHERE STORE scheduler, and RT state?
+
+
+ecode msg: split system, exit, debug, normal -> handle_msg, handle_sys_msg...
+
+handle_msg: try_handle_call and reply
+
+
+TODO:
+* What are system messages?
+* get Scheduler via Options
+* Create Supervisor
+* Add priority during init
+* Think about supervisor priority
