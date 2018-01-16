@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 15 Jan 2018 by kilian <kilian@kili4n2>
 %%%-------------------------------------------------------------------
--module(rttest).
+-module(rttest2).
 
 -behaviour(gen_rt_server).
 

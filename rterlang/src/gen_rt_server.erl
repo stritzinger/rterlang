@@ -156,8 +156,7 @@
 
 -optional_callbacks(
     [handle_info/2, terminate/2, code_change/3, format_status/2]).
-%Hardcoded for the moment
--define(DEADLINE, 1000*1000*10). %% 10 ms
+
 %%%  -----------------------------------------------------------------
 %%% Starts a generic server.
 %%% start(Mod, Args, Options)
@@ -287,14 +286,20 @@ multi_call(Nodes, Name, Req, Timeout)
   when is_list(Nodes), is_atom(Name), is_integer(Timeout), Timeout >= 0 ->
     do_multi_call(Nodes, Name, Req, Timeout).
 
+
 get_scheduler(Options) ->
     Scheduler = case lists:keyfind(scheduler, 1, Options) of
-	{scheduler, Sched} -> Sched;
-	false -> exit(no_scheduler_provided)
+		    {scheduler, Sched} -> Sched;
+		    false -> exit(no_scheduler_provided)
 		end,
     Scheduler.
-    
-    
+
+get_deadline(Options) ->    
+    Deadline = case lists:keyfind(deadline, 1, Options) of
+		   {deadline, D} -> D;
+		   false -> exit(no_deadline_provided)
+	       end,
+    Deadline.	    
 
 %%-----------------------------------------------------------------
 %% enter_loop(Mod, Options, State, <ServerName>, <TimeOut>) ->_ 
@@ -326,8 +331,9 @@ enter_loop(Mod, Options, State, ServerName, Timeout) ->
     Debug = gen:debug_options(Name, Options),
     HibernateAfterTimeout = gen:hibernate_after(Options),
     Scheduler = get_scheduler(Options),
+    Deadline = get_deadline(Options),
     erlang:process_flag(priority, max),
-    loop(Parent, Name, State, Scheduler, Mod, Timeout, ?DEADLINE, HibernateAfterTimeout, Debug).
+    loop(Parent, Name, State, Scheduler, Mod, Timeout, Deadline, HibernateAfterTimeout, Debug).
 
 %%%========================================================================
 %%% Gen-callback functions
@@ -348,15 +354,16 @@ init_it(Starter, Parent, Name0, Mod, Args, Options) ->
     HibernateAfterTimeout = gen:hibernate_after(Options),
 
     Scheduler = get_scheduler(Options),
+    Deadline = get_deadline(Options),
     erlang:process_flag(priority, max),
 
     case init_it(Mod, Args) of
 	{ok, {ok, State}} ->
 	    proc_lib:init_ack(Starter, {ok, self()}), 	    
-	    loop(Parent, Name, State, Scheduler, ?DEADLINE, Mod, infinity, HibernateAfterTimeout, Debug);
+	    loop(Parent, Name, State, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug);
 	{ok, {ok, State, Timeout}} ->
 	    proc_lib:init_ack(Starter, {ok, self()}), 	    
-	    loop(Parent, Name, State, Scheduler, ?DEADLINE, Mod, Timeout, HibernateAfterTimeout, Debug);
+	    loop(Parent, Name, State, Scheduler, Deadline, Mod, Timeout, HibernateAfterTimeout, Debug);
 	{ok, {stop, Reason}} ->
 	    %% For consistency, we must make sure that the
 	    %% registered name (if any) is unregistered before
@@ -428,6 +435,7 @@ queued_loop(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, H
     receive
 	'$okrun' -> 
 	    erlang:process_flag(priority, high),
+	    io:format("received $okrun"),
 	    decode_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib);
 	'$overload'->
 	    try_handle_overload(Mod, Msg, State)
@@ -436,7 +444,7 @@ queued_loop(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, H
 
 handle_rt(Msg, Parent, Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
     Arrival = erlang:monotonic_time(nanosecond),
-    ?MODULE:call(Scheduler, mayrun, Deadline),
+    ?MODULE:cast(Scheduler, {mayrun, self(), Deadline}),
     queued_loop(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib).
 
 try_handle_overload(Mod, Msg, State) ->
@@ -461,6 +469,7 @@ try_handle_dlmiss(Mod, State) ->
     
 rt_after_callback(State, Scheduler, Deadline, Arrival, Mod) ->
     Now = erlang:monotonic_time(nanosecond),
+    io:format("Execution Time: ~pms~n", [(Now-Arrival)/(1000*1000)]),
     if
 	Now - Arrival >= Deadline -> try_handle_dlmiss(Mod, State);
 	true -> 
@@ -754,8 +763,7 @@ handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Scheduler, Deadline, A
 	Other -> handle_common_reply(Other, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival)
     end;
 handle_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout) ->
-    Reply = try_dispatch(Msg, Mod, State),	
-    rt_after_callback(State, Scheduler, Deadline, Arrival, Mod),
+    Reply = try_dispatch(Msg, Mod, State),
     handle_common_reply(Reply, Parent, Name, undefined, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival).
 
 handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug) ->

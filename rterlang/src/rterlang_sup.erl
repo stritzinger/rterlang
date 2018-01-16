@@ -20,7 +20,7 @@
 %%====================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({global, ?SERVER}, ?MODULE, []).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -30,7 +30,7 @@ start_link() ->
 init([]) ->
     {ok, { {one_for_all, 0, 1},
 	   [
-	    {sched, {rt_scheduler, start_link, []},
+	    {sched, {rt_sched, start_link, []},
 	     permanent,
 	     1000,
 	     worker,
@@ -40,7 +40,13 @@ init([]) ->
 	     permanent,
 	     1000,
 	     worker,
-	     [rttest]}				 
+	     [rttest]},
+
+	    {rttest2, {rttest2, start_link, []},
+	     permanent,
+	     1000,
+	     worker,
+	     [rttest2]}
 ]} }.
 
 %%====================================================================

@@ -45,7 +45,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], [{priority_level, max}]).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [],[{priority_level, max}]).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -64,6 +64,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
+    io:format("~p starting~n", [?MODULE]),
     {ok, #state{running=none, waiting = []}}.
 
 %%--------------------------------------------------------------------
@@ -80,28 +81,24 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({mayrun, Deadline}, From, State) ->
-    NewTask = #rt_task{id = From, deadline = Deadline, arrival = erlang:monotonic_time(nanosecond)},
-    case {length(State#state.waiting), State#state.running} of
-	{0, none} ->
-	    NewState = State#state{running = NewTask},
-	    {reply, okrun, NewState};
-	_ ->
-	    NewState = State#state{waiting = [NewTask|State#state.waiting]},
-%%	    {reply, wait, NewState}
-	    {noreply, NewState}
-    end;
-handle_call(done, From, State) when State#state.running#rt_task.id =:= From ->
+
+handle_call(done, From, State) when State#state.running#rt_task.id =:= element(1, From) ->
     NewState = State#state{running = none},
+    io:format("~p is done~n", [From]),
     case length(State#state.waiting) of
-	0 -> {reply, ok, NewState};
+	0 -> 
+	    io:format("queue is empty~n"),
+	    {reply, ok, NewState};
 	_ -> 
+	    io:format("queue is not empty ~n"),
 	    {Next, NextState} = schedule(NewState),
-	    gen_server:call(Next, okrun),
+	    Next#rt_task.id ! '$okrun',
 	    FinalState = NextState#state{running = Next},
+	    io:format("Next to run: ~p~n", [Next]),
 	    {reply, ok, FinalState}
     end;
-handle_call(_Request, _From, State) ->
+handle_call(Request, From, State) ->
+    io:format("Unknown call: ~p From ~p~n", [Request, From]),
     Reply = error,
     throw(undefined),
     {reply, Reply, State}.
@@ -115,6 +112,21 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({mayrun, TaskId, Deadline}, State) ->
+    io:format("mayrun ~p ~p~n", [TaskId, Deadline]),
+    NewTask = #rt_task{id = TaskId, deadline = Deadline, arrival = erlang:monotonic_time(nanosecond)},
+    case {length(State#state.waiting), State#state.running} of
+	{0, none} ->
+	    io:format("go!!!~n"),
+	    NewState = State#state{running = NewTask},
+	    TaskId ! '$okrun',
+	    {noreply, NewState};
+	_ ->
+	    NewState = State#state{waiting = [NewTask|State#state.waiting]},
+	    io:format("wait!~n"),
+%%	    {reply, wait, NewState}
+	    {noreply, NewState}
+    end;
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -171,27 +183,26 @@ code_change(_OldVsn, State, _Extra) ->
 schedule(State) -> 
     Now = erlang:monotonic_time(nanosecond),
     %% 
-    Compare = fun (A, B) -> Now = erlang:monotonic_time(nanosecond),
-			    if 
-				(Now + A#rt_task.deadline  - A#rt_task.arrival) < (B#rt_task.deadline  - B#rt_task.arrival) ->
-				    false;
-				true -> true
-			    end
+    Compare = fun (A, B) -> 
+		      if 
+			  (Now + A#rt_task.deadline  - A#rt_task.arrival) < (B#rt_task.deadline  - B#rt_task.arrival) ->
+			      false;
+			  true -> true
+		      end
 	      end,				
-
 
     Sorted = lists:sort(Compare, State#state.waiting),
 
-    Is_Missed = fun (T) -> Now = erlang:monotonic_time(nanosecond),
-			   if
-			       (Now + T#rt_task.deadline - T#rt_task.arrival) =< 0 ->
-				   true;
-			       true -> false
-			   end
+    Is_Missed = fun (T) -> 
+			if
+			    (Now + T#rt_task.deadline - T#rt_task.arrival) =< 0 ->
+				true;
+			    true -> false
+			end
 		end,
     {Missed, Remaining} = lists:splitwith(Is_Missed, Sorted),
     
-    lists:map(fun (T) -> gen_server:call(T#rt_task.id, overload) end, Missed),
+    lists:map(fun (T) -> T#rt_task.id ! '$overload' end, Missed),
     [Next | Rest] = Remaining,
     NewState = State#state{waiting = Rest},
     {Next, NewState}.
