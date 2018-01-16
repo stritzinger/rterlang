@@ -94,7 +94,7 @@
 	 cast/2, reply/2,
 	 abcast/2, abcast/3,
 	 multi_call/2, multi_call/3, multi_call/4,
-	 enter_loop/3, enter_loop/4, enter_loop/5, wake_hib/7]).
+	 enter_loop/3, enter_loop/4, enter_loop/5, wake_hib/8]).
 
 %% System exports
 -export([system_continue/3,
@@ -147,16 +147,15 @@
       PDict :: [{Key :: term(), Value :: term()}],
       State :: term(),
       Status :: term().
--callback handle_overload(Msg :: term(), From :: {pid(), Tag :: term()}, State :: term()) ->
+-callback handle_overload(Msg :: term(), State :: term()) ->
     {stop, NewState :: term()} |
     {noreply, NewState :: term()}.
--callback handle_dlmiss(From :: {pid(), Tag ::term()}, State :: term()) ->
+-callback handle_dlmiss(State :: term()) ->
     {stop, NewState :: term()} |
     {noreply, NewState :: term()}.
 
 -optional_callbacks(
     [handle_info/2, terminate/2, code_change/3, format_status/2]).
-
 %Hardcoded for the moment
 -define(DEADLINE, 1000*1000*10). %% 10 ms
 %%%  -----------------------------------------------------------------
@@ -288,6 +287,14 @@ multi_call(Nodes, Name, Req, Timeout)
   when is_list(Nodes), is_atom(Name), is_integer(Timeout), Timeout >= 0 ->
     do_multi_call(Nodes, Name, Req, Timeout).
 
+get_scheduler(Options) ->
+    Scheduler = case lists:keyfind(scheduler, 1, Options) of
+	{scheduler, Sched} -> Sched;
+	false -> exit(no_scheduler_provided)
+		end,
+    Scheduler.
+    
+    
 
 %%-----------------------------------------------------------------
 %% enter_loop(Mod, Options, State, <ServerName>, <TimeOut>) ->_ 
@@ -317,8 +324,10 @@ enter_loop(Mod, Options, State, ServerName, Timeout) ->
     Name = gen:get_proc_name(ServerName),
     Parent = gen:get_parent(),
     Debug = gen:debug_options(Name, Options),
-	HibernateAfterTimeout = gen:hibernate_after(Options),
-    loop(Parent, Name, State, Mod, Timeout, ?DEADLINE, HibernateAfterTimeout, Debug).
+    HibernateAfterTimeout = gen:hibernate_after(Options),
+    Scheduler = get_scheduler(Options),
+    erlang:process_flag(priority, max),
+    loop(Parent, Name, State, Scheduler, Mod, Timeout, ?DEADLINE, HibernateAfterTimeout, Debug).
 
 %%%========================================================================
 %%% Gen-callback functions
@@ -338,13 +347,16 @@ init_it(Starter, Parent, Name0, Mod, Args, Options) ->
     Debug = gen:debug_options(Name, Options),
     HibernateAfterTimeout = gen:hibernate_after(Options),
 
+    Scheduler = get_scheduler(Options),
+    erlang:process_flag(priority, max),
+
     case init_it(Mod, Args) of
 	{ok, {ok, State}} ->
 	    proc_lib:init_ack(Starter, {ok, self()}), 	    
-	    loop(Parent, Name, State, ?DEADLINE, Mod, infinity, HibernateAfterTimeout, Debug);
+	    loop(Parent, Name, State, Scheduler, ?DEADLINE, Mod, infinity, HibernateAfterTimeout, Debug);
 	{ok, {ok, State, Timeout}} ->
 	    proc_lib:init_ack(Starter, {ok, self()}), 	    
-	    loop(Parent, Name, State, ?DEADLINE, Mod, Timeout, HibernateAfterTimeout, Debug);
+	    loop(Parent, Name, State, Scheduler, ?DEADLINE, Mod, Timeout, HibernateAfterTimeout, Debug);
 	{ok, {stop, Reason}} ->
 	    %% For consistency, we must make sure that the
 	    %% registered name (if any) is unregistered before
@@ -382,50 +394,50 @@ init_it(Mod, Args) ->
 %%% ---------------------------------------------------
 %%% The MAIN loop.
 %%% ---------------------------------------------------
-loop(Parent, Name, State, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug) ->
-    proc_lib:hibernate(?MODULE,wake_hib,[Parent, Name, State, Deadline, Mod, HibernateAfterTimeout, Debug]);
+loop(Parent, Name, State, Scheduler, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug) ->
+    proc_lib:hibernate(?MODULE,wake_hib,[Parent, Name, State, Scheduler, Deadline, Mod, HibernateAfterTimeout, Debug]);
 
-loop(Parent, Name, State, Deadline, Mod, infinity, HibernateAfterTimeout, Debug) ->
+loop(Parent, Name, State, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug) ->
 	receive
 		Msg ->
-			handle_rt(Msg, Parent, Name, State, Deadline, Mod, infinity, HibernateAfterTimeout, Debug, false)
+			handle_rt(Msg, Parent, Name, State, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug, false)
 	after HibernateAfterTimeout ->
-		loop(Parent, Name, State, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug)
+		loop(Parent, Name, State, Scheduler, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug)
 	end;
 
-loop(Parent, Name, State, Deadline, Mod, Time, HibernateAfterTimeout, Debug) ->
+loop(Parent, Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout, Debug) ->
     Msg = receive
 	      Input ->
 		    Input
 	  after Time ->
 		  timeout
 	  end,
-    handle_rt(Msg, Parent, Name, State, Deadline, Mod, Time, HibernateAfterTimeout, Debug, false).
+    handle_rt(Msg, Parent, Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout, Debug, false).
 
-wake_hib(Parent, Name, State, Deadline, Mod, HibernateAfterTimeout, Debug) ->
+wake_hib(Parent, Name, State, Scheduler, Deadline, Mod, HibernateAfterTimeout, Debug) ->
     Msg = receive
 	      Input ->
 		  Input
 	  end,
-    handle_rt(Msg, Parent, Name, State, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug, true).
+    handle_rt(Msg, Parent, Name, State, Scheduler, Deadline, Mod, hibernate, HibernateAfterTimeout, Debug, true).
 
 %%% ---------------------------------------------------
 %%% Real-Time additions
 %%% ---------------------------------------------------
-queued_loop(Msg, Parent, Name, State, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
+queued_loop(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
     receive
 	'$okrun' -> 
 	    erlang:process_flag(priority, high),
-	    decode_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib);
+	    decode_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib);
 	'$overload'->
 	    try_handle_overload(Mod, Msg, State)
 	%ignore other messages: FIFO
     end.
 
-handle_rt(Msg, Parent, Name, State, Deadline, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
+handle_rt(Msg, Parent, Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
     Arrival = erlang:monotonic_time(nanosecond),
     ?MODULE:call(Scheduler, mayrun, Deadline),
-    queued_loop(Msg, Parent, Name, State, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib).
+    queued_loop(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib).
 
 try_handle_overload(Mod, Msg, State) ->
     try
@@ -447,7 +459,7 @@ try_handle_dlmiss(Mod, State) ->
 	    {'EXIT', Class, R, erlang:get_stacktrace()}
     end.
     
-rt_after_callback(State, Deadline, Arrival, Mod) ->
+rt_after_callback(State, Scheduler, Deadline, Arrival, Mod) ->
     Now = erlang:monotonic_time(nanosecond),
     if
 	Now - Arrival >= Deadline -> try_handle_dlmiss(Mod, State);
@@ -456,19 +468,19 @@ rt_after_callback(State, Deadline, Arrival, Mod) ->
 	    erlang:process_flag(priority, max)
     end.
 
-decode_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
+decode_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout, Debug, Hib) ->
     case Msg of
 	{system, From, Req} ->
 	    sys:handle_system_msg(Req, From, Parent, ?MODULE, Debug,
-				  [Name, State, Mod, Time, HibernateAfterTimeout], Hib);
+				  [Name, State, Scheduler, Deadline, Arrival, Mod, Time, HibernateAfterTimeout], Hib);
 	{'EXIT', Parent, Reason} ->
 	    terminate(Reason, ?STACKTRACE(), Name, undefined, Msg, Mod, State, Debug);
 	_Msg when Debug =:= [] ->
-	    handle_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout);
+	    handle_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout);
 	_Msg ->
 	    Debug1 = sys:handle_debug(Debug, fun print_event/3,
 				      Name, {in, Msg}),
-	    handle_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug1)
+	    handle_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug1)
     end.
 
 %%% ---------------------------------------------------
@@ -716,54 +728,57 @@ try_terminate(Mod, Reason, State) ->
 %%% Message handling functions
 %%% ---------------------------------------------------
 
-handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout) ->
+handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout) ->
     Result = try_handle_call(Mod, Msg, From, State),
     case Result of
 	{ok, {reply, Reply, NState}} ->
 	    reply(From, Reply),
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, []);
 	{ok, {reply, Reply, NState, Time1}} ->
 	    reply(From, Reply),
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, []);
 	{ok, {noreply, NState}} ->
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, []);
 	{ok, {noreply, NState, Time1}} ->
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, []);
 	{ok, {stop, Reason, Reply, NState}} ->
 	    try
 		terminate(Reason, ?STACKTRACE(), Name, From, Msg, Mod, NState, [])
 	    after
 		reply(From, Reply)
 	    end;
-	Other -> handle_common_reply(Other, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Deadline, Arrival)
+	Other -> handle_common_reply(Other, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival)
     end;
-handle_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout) ->
+handle_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout) ->
     Reply = try_dispatch(Msg, Mod, State),	
-    rt_after_callback(State, Deadline, Arrival, Mod),
-    handle_common_reply(Reply, Parent, Name, undefined, Msg, Mod, HibernateAfterTimeout, State, Deadline, Arrival).
+    rt_after_callback(State, Scheduler, Deadline, Arrival, Mod),
+    handle_common_reply(Reply, Parent, Name, undefined, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival).
 
-handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug) ->
+handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug) ->
     Result = try_handle_call(Mod, Msg, From, State),
     case Result of
 	{ok, {reply, Reply, NState}} ->
 	    Debug1 = reply(Name, From, Reply, NState, Debug),
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
 	{ok, {reply, Reply, NState, Time1}} ->
 	    Debug1 = reply(Name, From, Reply, NState, Debug),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
 	{ok, {noreply, NState}} ->
 	    Debug1 = sys:handle_debug(Debug, fun print_event/3, Name,
 				      {noreply, NState}),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
 	{ok, {noreply, NState, Time1}} ->
 	    Debug1 = sys:handle_debug(Debug, fun print_event/3, Name,
 				      {noreply, NState}),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
 	{ok, {stop, Reason, Reply, NState}} ->
 	    try
 		terminate(Reason, ?STACKTRACE(), Name, From, Msg, Mod, NState, Debug)
@@ -771,20 +786,20 @@ handle_msg({'$gen_call', From, Msg}, Parent, Name, State, Deadline, Arrival, Mod
 		_ = reply(Name, From, Reply, NState, Debug)
 	    end;
 	Other ->
-	    handle_common_reply(Other, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Deadline, Arrival, Debug)
+	    handle_common_reply(Other, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival, Debug)
     end;
-handle_msg(Msg, Parent, Name, State, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug) ->
+handle_msg(Msg, Parent, Name, State, Scheduler, Deadline, Arrival, Mod, HibernateAfterTimeout, Debug) ->
     Reply = try_dispatch(Msg, Mod, State),
-    handle_common_reply(Reply, Parent, Name, undefined, Msg, Mod, HibernateAfterTimeout, State, Deadline, Arrival, Debug).
+    handle_common_reply(Reply, Parent, Name, undefined, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival, Debug).
 
-handle_common_reply(Reply, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Deadline, Arrival) ->
+handle_common_reply(Reply, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival) ->
     case Reply of
 	{ok, {noreply, NState}} ->
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, []);
 	{ok, {noreply, NState, Time1}} ->
-	    rt_after_callback(State, Deadline, Arrival, Mod),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, []);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, []);
 	{ok, {stop, Reason, NState}} ->
 	    terminate(Reason, ?STACKTRACE(), Name, From, Msg, Mod, NState, []);
 	{'EXIT', Class, Reason, Stacktrace} ->
@@ -793,16 +808,18 @@ handle_common_reply(Reply, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, 
 	    terminate({bad_return_value, BadReply}, ?STACKTRACE(), Name, From, Msg, Mod, State, [])
     end.
 
-handle_common_reply(Reply, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Deadline, _Arrival, Debug) ->
+handle_common_reply(Reply, Parent, Name, From, Msg, Mod, HibernateAfterTimeout, State, Scheduler, Deadline, Arrival, Debug) ->
     case Reply of
 	{ok, {noreply, NState}} ->
 	    Debug1 = sys:handle_debug(Debug, fun print_event/3, Name,
 				      {noreply, NState}),
-	    loop(Parent, Name, NState, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, infinity, HibernateAfterTimeout, Debug1);
 	{ok, {noreply, NState, Time1}} ->
 	    Debug1 = sys:handle_debug(Debug, fun print_event/3, Name,
 				      {noreply, NState}),
-	    loop(Parent, Name, NState, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
+	    rt_after_callback(NState, Scheduler, Deadline, Arrival, Mod),
+	    loop(Parent, Name, NState, Scheduler, Deadline, Mod, Time1, HibernateAfterTimeout, Debug1);
 	{ok, {stop, Reason, NState}} ->
 	    terminate(Reason, ?STACKTRACE(), Name, From, Msg, Mod, NState, Debug);
 	{'EXIT', Class, Reason, Stacktrace} ->
@@ -820,8 +837,8 @@ reply(Name, {To, Tag}, Reply, State, Debug) ->
 %%-----------------------------------------------------------------
 %% Callback functions for system messages handling.
 %%-----------------------------------------------------------------
-system_continue(Parent, Debug, [Name, State, Deadline, Mod, Time, HibernateAfterTimeout]) ->
-    loop(Parent, Name, State, Deadline, Mod, Time, HibernateAfterTimeout, Debug).
+system_continue(Parent, Debug, [Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout]) ->
+    loop(Parent, Name, State, Scheduler, Deadline, Mod, Time, HibernateAfterTimeout, Debug).
 
 -spec system_terminate(_, _, _, [_]) -> no_return().
 

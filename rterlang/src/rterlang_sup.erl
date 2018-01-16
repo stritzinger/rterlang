@@ -28,7 +28,20 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    {ok, { {one_for_all, 0, 1},
+	   [
+	    {sched, {rt_scheduler, start_link, []},
+	     permanent,
+	     1000,
+	     worker,
+	     [rt_scheduler]},
+
+	    {rttest, {rttest, start_link, []},
+	     permanent,
+	     1000,
+	     worker,
+	     [rttest]}				 
+]} }.
 
 %%====================================================================
 %% Internal functions

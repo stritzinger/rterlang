@@ -15,3 +15,4 @@ TODO:
 * Create Supervisor
 * Add priority during init
 * Think about supervisor priority
+* Have other entry via enter_loop in mind!

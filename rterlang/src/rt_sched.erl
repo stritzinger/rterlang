@@ -22,14 +22,14 @@
 -record(rt_task,
 	{
 	  name = "" :: string(),
-	  id :: pid(),
+	  id :: pid() | {pid(), atom()},
 	  deadline :: number(),
 	  arrival :: integer()
 	}).
 
 -record(state,
 	{
-	  running :: #rt_task{},
+	  running :: #rt_task{} | none,
 	  waiting :: list(#rt_task{})
 	}).
 
@@ -64,7 +64,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
-    {ok, #state{}}.
+    {ok, #state{running=none, waiting = []}}.
 
 %%--------------------------------------------------------------------
 %% @private
