@@ -3,7 +3,7 @@
 
 % API
 -export([open/0]).
--export([rec/1]).
+-export([command/2]).
 
 %--- Macros --------------------------------------------------------------------
 
@@ -13,12 +13,11 @@
 
 open() -> open_port({spawn_driver, "grisp_ir_drv"}, [binary]).
 
-rec(Port) ->
-%    Port ! {self(), {command, Command}},
-    io:fwrite("Listening........"),
+command(Port, Command) ->
+    Port ! {self(), {command, Command}},
     receive
-        {Port, Resp} ->
-            io:fwrite("Got ~p~n", [Resp]),
-	    rec(Port);
-	Msg -> io:fwrite("Got other ~p~n", [Msg])
+        {Port, {data, Resp}} ->
+	    Resp
+    after ?PORT_COMMAND_TIMEOUT ->
+	    exit({ir_driver_timeout, Command})
     end.
