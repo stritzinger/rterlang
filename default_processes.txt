@@ -1,0 +1,19 @@
+ lists:map(fun (N) -> {N, erlang:process_info(whereis(N), priority)} end, registered()).
+[{kernel_safe_sup,{priority,normal}},
+ {erts_code_purger,{priority,normal}},
+ {init,{priority,normal}},
+ {error_logger,{priority,normal}},
+ {erl_prim_loader,{priority,normal}},
+ {inet_db,{priority,normal}},
+ {rex,{priority,normal}},
+ {user_drv,{priority,normal}},
+ {kernel_sup,{priority,normal}},
+ {global_name_server,{priority,normal}},
+ {global_group,{priority,max}},
+ {user,{priority,normal}},
+ {file_server_2,{priority,normal}},
+ {code_server,{priority,normal}},
+ {application_controller,{priority,normal}},
+ {standard_error_sup,{priority,normal}},
+ {standard_error,{priority,normal}}]
+
