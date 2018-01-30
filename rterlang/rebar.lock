@@ -1,1 +1,18 @@
-[].
+{"1.1.0",
+[{<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
+ {<<"lager2json">>,
+  {git,"https://github.com/talentdeficit/lager2json.git",
+       {ref,"c94eb63ef6263417acc012eda93cf99e7d5d3099"}},
+  0},
+ {<<"lager_json_formatter">>,{pkg,<<"lager_json_formatter">>,<<"0.2.4">>},0},
+ {<<"rfc3339">>,{pkg,<<"rfc3339">>,<<"0.2.0">>},1}]}.
+[
+{pkg_hash,[
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
+ {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
+ {<<"lager_json_formatter">>, <<"BCA97B739A95433245A43D15661E63543AF690F11D2C57BCD76638FB8D6A17EF">>},
+ {<<"rfc3339">>, <<"73B3892FA62D5718D26E936FD763450D1109F7C7A9F88B5943C8A2918BE5C48E">>}]}
+].
