@@ -13,6 +13,7 @@ start(N) ->
     timer:sleep(10),
     lager:info("Tasks: ~p", [Tasks]),
     lager:info("Sending messages"),
+    lager:info([{rt_start, erlang:monotonic_time(microsecond)}], "GOGOGO"),
     [ Pid ! {self(), test_msg, Id} || {Id, Pid} <- Tasks ].
 %    lists:map(fun ({Id, Pid}) -> Pid ! {self, test_msg, Id}  end, Tasks).
 
@@ -28,7 +29,7 @@ loop(Id) ->
     end.
 
 handle_msg(From, Msg, Id) ->
-    Deadline = floor(rand:uniform() * 800),
+    Deadline = floor(rand:uniform() * 800 * 1000 * 1000), %nanoseconds
     lager:info("Task ~p: ~p received ~p from ~p. Deadline ~p", [Id, self(), Msg, From, Deadline]),
     rt:new_msg(Deadline),
     Exec1 = floor(rand:uniform() * 100),

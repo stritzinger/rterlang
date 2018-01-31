@@ -7,6 +7,8 @@
 	 done/0,
 	 yield/0]).
 
+-define(NANONOW, {now, erlang:monotonic_time(microsecond)}).
+
 %% rt_deadlines: {deadline, pid}
 %% rt_active: {pid}
 
@@ -33,23 +35,29 @@ new_msg(Deadline) ->
 	[{Deadline_absolute}] -> Deadline_absolute2 = Deadline_absolute + 1;
 	[] -> Deadline_absolute2 = Deadline_absolute
     end,
-    lager:info("T ~p absolute DL ~p", [get(id), Deadline_absolute2]),
+    %we log in microseconds...
+    lager:info([{rt_dispatch, get(id)}, {rt_deadline, Deadline_absolute2/1000}, ?NANONOW], "T ~p absolute DL ~p", [get(id), Deadline_absolute2]),
     ets:insert(rt_deadline, {Deadline_absolute2, self()}),
     put(deadline, Deadline_absolute2),
     yield().
 
 done() ->
-    lager:info("Task ~p is done", [get(id)]),
+    lager:info([{rt_done, get(id)}, ?NANONOW], "Task ~p is done", [get(id)]),
     ets:delete(rt_active, self()),
     ets:delete(rt_deadline, get(deadline)),
     erlang:process_flag(priority, max),
     try next_to_run() of
 	none -> ok;
 	Pid -> 
+	    lager:info("Task ~p checks if ~p is already active", [get(id), Pid]),
 	    N_active = length(ets:lookup(rt_active, Pid)),
 	    if
-		N_active =:= 0 -> Pid ! '$wakeup';
-		true -> ok
+		N_active =:= 0 -> 
+		    lager:info("Task ~p is not active yet, sending wakeup", [Pid]),
+		    Pid ! '$wakeup';
+		true -> 
+		    lager:info("~p is lready running", [Pid]),
+		    ok
 	    end
     catch
 	throw:table_changed -> well
@@ -57,32 +65,35 @@ done() ->
 
 % Called repetetively
 yield() ->
-    lager:info("T ~p ~p yielded", [get(id), self()]),
+    lager:info([{rt_yield, get(id)}, ?NANONOW], "T ~p ~p yielded", [get(id), self()]),
     case get(rt) of
 	true -> 
 	    Self = self(),	    
 	    try next_to_run() of
-		    none -> notok;
-		    Self ->
-			Self = self(),
-			Lookup = ets:lookup(rt_active, Self),
-			case length(Lookup) of
-			    0 ->
-				ets:insert(rt_active, {self()}),
-				erlang:process_flag(priority, high),
-				ok;
-			    1 -> ok
-			end;
-		    _Other ->
-			lager:info("T~p ~p entering wakeup receive", [get(id), self()]),
-			receive
-			    '$wakeup' ->
-				lager:info("T~p ~p received wakeup, yield()..." , [get(id), self()]),
-				yield()
-			end
-		catch
-		    throw:table_changed -> yield() %start from scratch
-		end;
+		none -> notok;
+		Self ->
+		    Self = self(),
+		    Lookup = ets:lookup(rt_active, Self),
+		    case length(Lookup) of
+			0 ->
+			    ets:insert(rt_active, {self()}),
+			    erlang:process_flag(priority, high),
+			    lager:info([{rt_run, get(id)}, ?NANONOW], "T ~p running", [get(id)]),
+			    ok;
+			1 -> ok
+		    end;
+		_Other ->
+		    lager:info("T~p Removing from active list", [get(id)]),
+		    ets:delete(rt_active, self()),
+		    lager:info([{rt_sleep, get(id)}, ?NANONOW], "T~p ~p entering wakeup receive", [get(id), self()]),
+		    receive
+			'$wakeup' ->
+			    lager:info("T~p ~p received wakeup, yield()..." , [get(id), self()]),
+			    yield()
+		    end
+	    catch
+		throw:table_changed -> yield() %start from scratch
+	    end;
 	undefined -> false
     end.
 
@@ -100,21 +111,3 @@ next_to_run() ->
 		true -> Other
 	    end
     end.
-	    
-		    
-		    
-	       
-	    
-%% Self = self(),
-%% 	    case lists:map(
-%% 			fun (First, Self) -> self;
-
-%% 			ets:lookup(rt_deadline, First) of
-%% 		     [] -> throw(table_changed);
-%% 		     [{First, self()}] -> self;
-%% 		     [{First, Other}] -> Other
-%% 		 end,
-%% 		 First
-%%     end,
-%%     lager:info("T~p ~p: Next to run: ~p", [get(id), self(), First]),
-%%     First.
