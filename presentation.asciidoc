@@ -1,0 +1,86 @@
+= Hard Real-Time Functional Reactive Programming in Erlang
+:author: Peer Stritzinger and Kilian Holzinger
+:backend: slidy
+:max-width: 45em
+
+
+== Overview
+. Real-Time Introduction
+. Real-Time with Erlang
+. Functional Reactive Programming (FRP) Introduction
+. Demonstrator
+
+== What is Real-Time?
+Correctness of computation depend on
+
+* Functionality
+* Timing
+
+*Soft Real-Time*: We have a desired reaction eventually
+
+*Hard Real-Time*: We have a desired reaction within certain deadline
+
+Hard Real-Time (RT) does not necessary mean that it's fast!
+
+== Typical Real-Time Systems
+some pictures....
+
+== Erlang in one Slide
+* Functional
+* Zero Side Effects in Functions
+* OTP framework simplifies fault-tolerant applications
+* Supports Dynamic Software Update (during execution)
+* Message Passing
+* Garbage Collecotr (GC)
+* Dynamicly Typed
+* Light-weight processes: Erlang Runtime System (ERTS) scheduler
+* Distribution: Message passing over the network
+
+== Objections to Hard Real-Time Erlang
+* It's a Process VM
+* GC
+* No Real-Time Scheduler
+* Running on Non-RT-OS
+
+== GRiSP: Bare-Metal Erlang
+Erlang on GRiSP: Real-Time OS RTEMS with Erlang-VM on top
+
+* Direct access to bus systems (I^2^C, SPI) and GPIO
+* WiFi + Erlang Distribution = Distributed Embedded IoT-capable System
+* FOSS: nothing hidden, possible low-level timing issues can be identified
+* Erlang VM barely interrupted
+* Erlang becomes part of the OS
+
+== The Erlang Garbage Collector
+* Per Process
+* Dynamicly growing and shrinking heap
+* Possibly during each scheduler iteration
+
+*How to suspend GC during RT tasks?*
+
+* Live of typical Erlang process:
+  . Spawn
+  . wait for msg in `receive`
+  . `handle_msg()`
+  . `loop()`
+* Idea: Force GC before `receive`
+* Pre-allocate more-than-enough heap with `?`
+
+=> GC becomes deterministic
+
+== The Erlang Scheduler
+* Doesn't know deadlines
+* has 4 priorities: `low`, `normal`, `high` and `max`
+* Runs every 2000 reductions ~= function calls
+* Usually one scheduler per CPU core
+
+=> This is our weak point
+
+
+
+=== Links
+
+- GRiSP https://grisp.org
+- RTEMS https://rtems.org
+- GRiSP on Github https://github.com/grisp
+
