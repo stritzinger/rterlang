@@ -1,11 +1,23 @@
 -module(test_ir).
 
--export([test/1]).
+-export([test/0, test/2]).
 
-test(Attr) ->
+test() ->
+    test(gpio1_3, [pullup, deglitch, debounce, it_fall_edge]).
+
+test(Pin, Attr) ->
     io:fwrite("Starting port~n"),
     P = grisp_ir_drv:open(),
     io:fwrite("Register IR~n"),
-    grisp_ir_drv:configure_ir(P, gpio1_3, Attr),
+    grisp_ir_drv:register_ir(P, Pin, Attr),
+    io:fwrite("Activate IR~n"),
+    grisp_ir_drv:activate_ir(P, Pin, 3),
     io:fwrite("Listening~n"),
-    grisp_ir_drv:rec().
+    rec().
+
+rec() ->
+    receive
+	Msg ->
+	    io:fwrite("~p~n", [Msg]),
+	    rec()
+    end.
