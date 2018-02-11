@@ -100,11 +100,9 @@ init() ->
 
 move_to(degrees, Degrees) ->
     One_Degree = (512000 / 10) * (1 / 360),
-    Val = floor(Dregrees * One_Degree),
+    Val = floor(Degrees * One_Degree),
     raw(<<16#AD:8,Val:32>>).
 
-raw(<<16#AD0000058e:40>>).
-    
 write_request(Slot, Reg, Val) ->
     request(Slot, <<?RW_WRITE:1, Reg:7, Val:32>>).
 
