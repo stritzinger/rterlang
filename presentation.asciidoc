@@ -76,7 +76,8 @@ Erlang on GRiSP: Real-Time OS RTEMS with Erlang-VM on top
 
 => This is our weak point
 
-
+very good low-latency soft RT capabilities of Erlang
+priority inversion should not exist in erlang?!?
 
 === Links
 
