@@ -8,121 +8,62 @@
 %%%-------------------------------------------------------------------
 -module(seesaw).
 
--behaviour(gen_server).
+-export([start_link/0,
+	 init/1,
+	 system_continue/3,
+	 system_terminate/4,
+	 system_code_change/4]).
 
-%% API
--export([start_link/0]).
+-define(DEGREES, 5).
 
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+start_link() -> proc_lib:start_link(?MODULE , init, [self()]).
 
--define(SERVER, ?MODULE).
+init(Parent) ->
+    register(?MODULE, self()),  
+    io:fwrite("Opening port~n"),
+    P = grisp_ir_drv:open(),
+    PinConfig = [pullup, deglitch, debounce, it_rise_edge],
+    io:fwrite("Registering interrupts"),
+    grisp_ir_drv:register_ir(P, gpio1_3, PinConfig),
+    grisp_ir_drv:register_ir(P, gpio1_4, PinConfig),
+    io:fwrite("Initalize motor driver trinamic5130"),
+    trinamic5130:init(),
+    io:fwrite("Going into start position"),
+    trinamic5130:init(degrees, ?DEGREES)
+    io:fwrite("Activating interrupts"),
+%    grisp_ir_drv:activate_ir(P, gpio1_3, 1),
+    grisp_ir_drv:activate_ir(P, gpio1_4, 1),
+    io:fwrite("Init complete, please put the ball into the tube without an impulse!"),
+    rt:make_rt(1),
+    proc_lib:init_ack({ok, self()}),
+    loop(Parent, P).
 
--record(state, {}).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+loop(Parent, P) ->
+    receive
+        %% If you enable trap_exit, you also want this clause.
+	{'EXIT', Parent, Reason} ->
+            exit(Reason);
+	{system, From, Request} ->
+	    sys:handle_system_msg(Request, From, Parent, ?MODULE, [], {state, Parent}),
+	    loop(Parent);
+	{P, {data, <<3>>}} -> 
+	    trinamic5130:move_to(degrees, ?DEGREES),
+	    grisp_ir_drv:activate_ir(P, gpio1_4, 1),
+	    loop(Parent, P);
+	{P, {data, <<4>>}} ->
+	    trinamic5130:move_to(degrees, -?DEGREES),
+	    grisp_ir_drv:activate_ir(P, gpio1_3, 1),
+	    loop(Parent, P)
+    end.
 
-%%%===================================================================
-%%% gen_server callbacks
-%%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
-init([]) ->
-    process_flag(trap_exit, true),
-    {ok, #state{}}.
+system_continue(_, _, {state, Parent}) -> loop(Parent).
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+system_terminate(Reason, _, _, _) -> exit(Reason).
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+system_code_change(Misc, _, _, _) -> {ok, Misc}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_info(_Info, State) ->
-    {noreply, State}.
+%----------- Internal ---------------
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
-    ok.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
