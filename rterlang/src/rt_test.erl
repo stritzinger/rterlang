@@ -1,21 +1,41 @@
 -module(rt_test).
 
--export([start/1]).
+-export([start/0]).
 -export([enter_task/1]).
 % init
 
-start(N) ->
+start() ->
     lager:start(),
-    rt:init(),
     lager:info("Started tasks"),
-    Tasks = [ {Id, spawn(?MODULE, enter_task, [Id])} || Id <- lists:seq(1,N)],
+%    Tasks = [ {Id, spawn(?MODULE, enter_task, [Id])} || Id <- lists:seq(1,N)],
+    supervisor:start_child(rterlang_sup,
+			   {task1, {rt_testtask, start_link, [1]},
+			    permanent,
+			    1000,
+			    worker,
+			    [task1]
+			    }),
+    supervisor:start_child(rterlang_sup,
+			   {task2, {rt_testtask, start_link, [2]},
+			    permanent,
+			    1000,
+			    worker,
+			    [task2]
+			    }),
+    io:fwrite("sup: ~p~n", [supervisor:start_child(rterlang_sup,
+			   {task3, {rt_testtask, start_link, [3]},
+			    permanent,
+			    1000,
+			    worker,
+			    [task3]
+			    })]),
+    io:fwrite("sup childs ~p~n", [supervisor:which_children(rterlang_sup)]),
     % let them initialize
     timer:sleep(10),
-    lager:info("Tasks: ~p", [Tasks]),
-    lager:info("Sending messages"),
-    lager:info([{rt_start, erlang:monotonic_time(microsecond)}], "GOGOGO"),
-    [ Pid ! {self(), test_msg, Id} || {Id, Pid} <- Tasks ].
-%    lists:map(fun ({Id, Pid}) -> Pid ! {self, test_msg, Id}  end, Tasks).
+    lager:info([{rt_start, erlang:monotonic_time(millisecond)}], "GOGOGO"),
+    task1 ! {self(), test_msg, 1},
+    task2 ! {self(), test_msg, 2},
+    task3 ! {self(), test_msg, 3}.
 
 enter_task(Id) ->
     rt:make_rt(Id),

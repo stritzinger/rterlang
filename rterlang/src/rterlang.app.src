@@ -1,8 +1,8 @@
 {application, rterlang,
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
-  {registered, []},
-  {mod, { rterlang_app, []}},
+  {registered, [rterlang_sup, rt_testtask, rt_watchdog, task1, task2, task3]},
+  {mod, { rterlang_app, [rterlang_sup, rt_testtask, rt_watchdog, task1, task2, task3]}},
   {applications,
    [kernel,
     stdlib

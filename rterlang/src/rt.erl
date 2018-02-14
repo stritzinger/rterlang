@@ -10,7 +10,7 @@
 	 try_wakeup/0
 	]).
 
--define(NANONOW, {now, erlang:monotonic_time(microsecond)}).
+-define(NANONOW, {now, erlang:monotonic_time(millisecond)}).
 
 %% rt_deadlines: {deadline, pid}
 %% rt_queued: {pid, deadline}
@@ -23,7 +23,7 @@ make_rt() ->
 make_rt(Id) ->
     put(rt, true),
     put(id, Id),
-    ets:insert(rt_processes, self()),
+    ets:insert(rt_processes, {self()}),
     erlang:process_flag(priority, max).
 
 remove_rt() ->
@@ -32,7 +32,7 @@ remove_rt() ->
 
 new_msg(Deadline) -> 
     % make sure deadline does not exist already
-    Now = erlang:monotonic_time(nanosecond),
+    Now = erlang:monotonic_time(millisecond),
     Deadline_absolute = Now + Deadline,
     %% case ets:lookup(rt_deadline, Deadline_absolute) of
     %% 	[{Deadline_absolute, _Pid}] ->
@@ -41,7 +41,7 @@ new_msg(Deadline) ->
     %% 	    Deadline_absolute2 = Deadline_absolute
     %% end,
     %we log in microseconds...
-    lager:info([{rt_dispatch, get(id)}, {rt_deadline, Deadline_absolute/1000}, ?NANONOW], "T ~p absolute DL ~p", [get(id), Deadline_absolute]),
+    lager:info([{rt_dispatch, get(id)}, {rt_deadline, Deadline_absolute}, ?NANONOW], "T ~p absolute DL ~p Now ~p", [get(id), Deadline_absolute, Now]),
     ets:insert(rt_deadline, {Deadline_absolute, self()}),
     ets:insert(rt_queued, {self(), Deadline_absolute}),
     put(deadline, Deadline_absolute),
@@ -67,7 +67,6 @@ yield() ->
 	    % Check if there are missed Deadlines, send kills
 	    Self = self(),	    
 	    try next_to_run() of
-		none -> notok;
 		Self ->
 		    Self = self(),
 		    Lookup = ets:lookup(rt_active, Self),
@@ -99,7 +98,7 @@ next_to_run() ->
     case ets:lookup(rt_deadline, ets:first(rt_deadline)) of
 	[] -> none;
 	[{_Deadline, Pid}] -> 
-	    lager:info("Task ~p: Self: ~ Other: ~p", [get(id), self(), Pid]),
+	    lager:info("Task ~p: Self: ~p Other: ~p", [get(id), self(), Pid]),
 	    Pid
     end.
 
@@ -120,15 +119,15 @@ try_wakeup() ->
     end.
 
 kill_missed_deadlines() ->
-    Now = erlang:monotonic_time(nanosecond),
+    Now = erlang:monotonic_time(millisecond),
     case ets:lookup(rt_deadline, ets:first(rt_deadline)) of
 	[] ->
 	    ok;
 	[{Deadline, Pid}] ->
 		if
-		    Deadline - Now >= 0 ->
-			lager:warning([{rt_missed_deadline, Pid}, ?NANONOW], "Task ~p missed deadline, sending kill", [Pid]),
-			ets:delete(rt_deadlines, Deadline),
+		    Now - Deadline >= 0 ->
+			lager:warning([{rt_missed_deadline, Pid}, ?NANONOW], "Task ~p missed deadline ~p, sending kill", [Pid, Deadline]),
+			ets:delete(rt_deadline, Deadline),
 			ets:delete(rt_active, Pid),
 			ets:delete(rt_processes, Pid),
 			exit(Pid, kill), % if Pid =:= self() it's over here, otherwise there might be more

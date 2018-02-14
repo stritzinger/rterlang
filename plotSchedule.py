@@ -64,15 +64,7 @@ for task_id, task in taskset.items():
                  rotation=60,
                  bbox=dict(boxstyle="round", color="orange"),
                  horizontalalignment='center', verticalalignment='center')
-plt.xlabel("microseconds")
+plt.xlabel("milliseconds")
 plt.ylim(1,4)
 plt.savefig("schedule.pdf")
 plt.show()
-
-# Events we are looking for:
-#   * Start of Test
-#   * Arrival
-#   * Start
-#   * Yields
-#   * Deadline
-#   * Done

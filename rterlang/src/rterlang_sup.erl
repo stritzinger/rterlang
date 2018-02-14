@@ -20,7 +20,7 @@
 %%====================================================================
 
 start_link() ->
-    supervisor:start_link({global, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -28,26 +28,37 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1},
+    process_flag(priority, max),
+    {ok, { #{strategy => one_for_all,
+	     intensity => 1,
+	     period => 1},
+	   %% [
+	   %%  {sched, {rt_sched, start_link, []},
+	   %%   permanent,
+	   %%   1000,
+	   %%   worker,
+	   %%   [rt_scheduler]},
+
+	   %%  {rttest, {rttest, start_link, []},
+	   %%   permanent,
+	   %%   1000,
+	   %%   worker,
+	   %%   [rttest]},
+
+	   %%  {rttest2, {rttest2, start_link, []},
+	   %%   permanent,
+	   %%   1000,
+	   %%   worker,
+	   %%   [rttest2]}
 	   [
-	    {sched, {rt_sched, start_link, []},
+	    {rt_watchdog, {rt_watchdog, start_link, []},
 	     permanent,
 	     1000,
 	     worker,
-	     [rt_scheduler]},
-
-	    {rttest, {rttest, start_link, []},
-	     permanent,
-	     1000,
-	     worker,
-	     [rttest]},
-
-	    {rttest2, {rttest2, start_link, []},
-	     permanent,
-	     1000,
-	     worker,
-	     [rttest2]}
-]} }.
+	     [rt_watchdog]}
+	    ]	   
+	 }
+    }.
 
 %%====================================================================
 %% Internal functions
