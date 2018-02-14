@@ -55,7 +55,17 @@ init([]) ->
 	     permanent,
 	     1000,
 	     worker,
-	     [rt_watchdog]}
+	     [rt_watchdog]},
+	    {echotask, {echotask, start_link, []},
+	     permanent,
+	     1000,
+	     worker,
+	     [echotask]},
+	    {disklogger, {disklogger, start_link, []},
+	     permanent,
+	     1000,
+	     worker,
+	     [disklogger]}
 	    ]	   
 	 }
     }.

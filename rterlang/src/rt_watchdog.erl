@@ -24,7 +24,8 @@ init(Parent) ->
     ets:new(rt_processes, [set, named_table, public]),
     lager:info("Created ETS tabled for RT"),
     Timer = timer:send_after(?INTERVAL, self(), woof),
-    proc_lib:init_ack({ok, self()}), loop(Parent, Timer).
+    proc_lib:init_ack({ok, self()}),
+    loop(Parent, Timer).
 
 loop(Parent, Timer) ->
     receive
@@ -68,7 +69,7 @@ loop(Parent, Timer) ->
 	%%     ets:delete(rt_processes, From);
 	{woof} -> 
 	    erlang:cancel_timer(Timer),
-	    lager:info([{woof, ?NANONOW}], "Watchdog: woof"),
+	    %lager:info([{woof, ?NANONOW}], "Watchdog: woof"),
 	    rt:kill_missed_deadlines(),
 	    New_Timer = erlang:send_after(?INTERVAL, self(), woof),
 	    loop(Parent, New_Timer)
