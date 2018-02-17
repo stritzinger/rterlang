@@ -2,10 +2,10 @@
 image_path = /media/mmcsd-0-0/{{release_name}}/erts-{{erts_vsn}}/bin/beam.bin
 
 [erlang]
-args = erl.rtems -- -home . -pa . -root {{release_name}} -boot {{release_name}}/releases/{{release_version}}/{{release_name}} -internal_epmd epmd_sup -kernel inetrc "./erl_inetrc" -sname {{release_name}} -setcookie GRISP
+args = erl.rtems -- -mode embedded -home . -pa . -root {{release_name}} -boot {{release_name}}/releases/{{release_version}}/{{release_name}} -internal_epmd epmd_sup -kernel inetrc "./erl_inetrc" -sname {{release_name}} -setcookie GRISP
 
 [network]
 ip_self=dhcp
 wlan=enable
-hostname={{release_name}}
+hostname=grisp104
 wpa=wpa_supplicant.conf

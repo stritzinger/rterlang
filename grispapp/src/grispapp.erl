@@ -11,7 +11,7 @@
 %--- Callbacks -----------------------------------------------------------------
 
 start(_Type, _Args) -> 
-	{ok, _Pid} = elli:start_link([{callback, elli_minimal_callback}, {port, 3000}]),
+	%{ok, _Pid} = elli:start_link([{callback, elli_minimal_callback}, {port, 3000}]),
 	grispapp_sup:start_link().
 
 stop(_State) -> ok.

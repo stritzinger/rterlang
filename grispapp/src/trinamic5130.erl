@@ -79,19 +79,20 @@ init() ->
 
     raw(<<16#8000000000:40>>),
     raw(<<16#EC000101D5:40>>), % chopconf
-    raw(<<16#9000070603:40>>), %ihold
-    raw(<<16#910000000A:40>>), % tpowerdown
+    %raw(<<16#9000070603:40>>), %ihold
+    raw(<<16#90:8, 0:13, 2#1110:4, 0:3, 2#11110:5, 0:2, 2#10000:5>>),
+    raw(<<16#91000000FF:40>>), % tpowerdown
     raw(<<16#F000000000:40>>),
     %raw(<<16#8000000004:40>>), %stealth chop
     %raw(<<16#93000001F4:40>>), %switching velocity
     %raw(<<16#F0000401C8:40>>), %pwm conf switch amplitude
 
     raw(<<16#A4000003E8:40>>), % 1000 first accel
-    raw(<<16#A5000186A0:40>>), % V1 = 50k
+    raw(<<16#A50000C350:40>>), % V1 = 50k
     raw(<<16#A60000C350:40>>), % AMAX 500
     raw(<<16#A7000186A0:40>>), % VMAX
 %    raw(<<16#A8000002BC:40>>), % DMAX 700
-    raw(<<16#AA00000578:40>>), % D1 = 1400
+    raw(<<16#AA00001578:40>>), % D1 = 1400
     raw(<<16#AB0000000A:40>>), % VSTOP 10
     raw(<<16#A000000000:40>>), % Rampmode 0
 
@@ -123,8 +124,8 @@ test() ->
 
     raw(<<16#8000000000:40>>),
     raw(<<16#EC000101D5:40>>), % chopconf
-    raw(<<16#9000070603:40>>), %ihold
-    raw(<<16#910000000A:40>>), % tpowerdown
+    raw(<<16#900007061A:40>>), %ihold
+    raw(<<16#91000000AA:40>>), % tpowerdown
     raw(<<16#F000000000:40>>),
     %raw(<<16#8000000004:40>>), %stealth chop
     %raw(<<16#93000001F4:40>>), %switching velocity
@@ -160,9 +161,9 @@ test() ->
     %% raw(<<16#2100000000:40>>).
 
 raw(D) ->
-    io:fwrite("Send ~p~n", [D]),
-    Res = request(spi2, D),
-    io:fwrite("Got ~p~n~n", [Res]).
+    %io:fwrite("Send ~p~n", [D]),
+    Res = request(spi2, D).
+    %io:fwrite("Got ~p~n~n", [Res]).
     
 
     

@@ -1,14 +1,22 @@
 {"1.1.0",
-[{<<"elli">>,
-  {git,"git://github.com/knutin/elli.git",
-       {ref,"995be6243964cbffd0e83c16f84918f805d58aae"}},
-  0},
- {<<"epmd">>,
+[{<<"epmd">>,
   {git,"https://github.com/erlang/epmd.git",
        {ref,"4d1a595b9d5c32fc0e55f462da381de62de23bf0"}},
   0},
- {<<"mapz">>,{pkg,<<"mapz">>,<<"0.3.0">>},1}]}.
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
+ {<<"lager2json">>,
+  {git,"https://github.com/talentdeficit/lager2json.git",
+       {ref,"c94eb63ef6263417acc012eda93cf99e7d5d3099"}},
+  0},
+ {<<"mapz">>,{pkg,<<"mapz">>,<<"0.3.0">>},1},
+ {<<"rfc3339">>,{pkg,<<"rfc3339">>,<<"0.2.0">>},1}]}.
 [
 {pkg_hash,[
- {<<"mapz">>, <<"438D24746CE5A252101E00B2032EFDF7FC69EB32689D3B805DE5E6DD7F52614F">>}]}
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
+ {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
+ {<<"mapz">>, <<"438D24746CE5A252101E00B2032EFDF7FC69EB32689D3B805DE5E6DD7F52614F">>},
+ {<<"rfc3339">>, <<"73B3892FA62D5718D26E936FD763450D1109F7C7A9F88B5943C8A2918BE5C48E">>}]}
 ].
