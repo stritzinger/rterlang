@@ -18,9 +18,9 @@
 
 -define(STOP_DEG, 7).
 -define(ROLL_DEG, 2).
--define(P_VAL_T, 1000*1000*350).
--define(P_VAL_A, 1000*1000*6).
--define(SCHWELLE, 1000*100).
+-define(P_VAL_T, 1000*1000*300).
+-define(P_VAL_A, 1000*1000*4).
+-define(SCHWELLE, 1000*200).
 
 start_link() -> proc_lib:start_link(?MODULE , init, [self()]).
 
@@ -53,13 +53,23 @@ reset() ->
      trinamic5130:move_to(degrees, 1.5).
 
 pcontrol_t(Val) ->
-    abs(round(?P_VAL_T / Val)).
+    case Res = abs(round(?P_VAL_T / Val)) of
+	Res when Res =< 1000 -> Res;
+	Res -> 1000
+    end.
+	     
 pcontrol_a(Val) ->
-    abs(round(?P_VAL_A / Val)).
+    case Res = abs(round(?P_VAL_A / Val)) of
+	Res when Res =< 8 -> Res;
+	Res -> 8
+    end.
   
 loop(Parent, P, Richtung, Time, LastDiff, RollAngle) ->
     receive
         %% If you enable trap_exit, you also want this clause.
+	reset ->
+	    reset(),
+	    loop(Parent, P, links, erlang:monotonic_time(microsecond), 0, 0);
 	{'EXIT', Parent, Reason} ->
             exit(Reason);
 	{system, From, Request} ->
@@ -70,7 +80,7 @@ loop(Parent, P, Richtung, Time, LastDiff, RollAngle) ->
 		links ->
 		    Now = erlang:monotonic_time(microsecond),
 		    Diff = Now - Time,
-		    trinamic5130:move_to(degrees, - pcontrol_a(Diff) - RollAngle),
+		    trinamic5130:move_to(degrees, - pcontrol_a(Diff)),
 		    timer:sleep(pcontrol_t(Diff)),
 		    if
 			Diff - LastDiff >= ?SCHWELLE -> RollAngleNew = RollAngle + 0.1;
@@ -80,9 +90,10 @@ loop(Parent, P, Richtung, Time, LastDiff, RollAngle) ->
 		    trinamic5130:move_to(degrees, - ?ROLL_DEG - RollAngleNew),
 		    grisp_ir_drv:activate_ir(P, spi1_pin9, 1), 
 		    io:fwrite("Korrekur: ~p~n", [RollAngleNew]), 
-		    ?MODULE:loop(Parent, P, rechts, Time, Diff, RollAngleNew);
-		rechts ->
 		    grisp_ir_drv:activate_ir(P, spi1_pin10, 1),
+		    ?MODULE:loop(Parent, P, rechts, Time, Diff, RollAngleNew);
+
+		rechts ->
 		    Now = erlang:monotonic_time(microsecond),
 		    ?MODULE:loop(Parent, P, rechts, Now, LastDiff, RollAngle)
 	    end;	    
@@ -91,7 +102,7 @@ loop(Parent, P, Richtung, Time, LastDiff, RollAngle) ->
 		rechts ->
 		    Now = erlang:monotonic_time(microsecond),
 		    Diff = Now - Time,		    
-		    trinamic5130:move_to(degrees, pcontrol_a(Diff) + RollAngle),
+		    trinamic5130:move_to(degrees, pcontrol_a(Diff)),
 		    
 		    timer:sleep(pcontrol_t(Diff)),
 		    if
@@ -102,9 +113,9 @@ loop(Parent, P, Richtung, Time, LastDiff, RollAngle) ->
 		    trinamic5130:move_to(degrees, ?ROLL_DEG + RollAngleNew),
 		    grisp_ir_drv:activate_ir(P, spi1_pin10, 1),
 		    io:fwrite("Korrekur: ~p~n", [RollAngleNew]), 
+		    grisp_ir_drv:activate_ir(P, spi1_pin9, 1),
 		    ?MODULE:loop(Parent, P, links, Time, Diff, RollAngleNew);
 		links ->
-		    grisp_ir_drv:activate_ir(P, spi1_pin9, 1),
 		    Now = erlang:monotonic_time(microsecond),
 		    ?MODULE:loop(Parent, P, links, Now, LastDiff, RollAngle)
 	    end;
