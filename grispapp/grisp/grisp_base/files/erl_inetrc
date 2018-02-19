@@ -1,7 +1,7 @@
 %--- Erlang Inet Configuration -------------------------------------------------
 
 % Add hosts
-{host, {192,168,0,100}, ["kili4n2"]}.
+{host, {192,168,0,101}, ["kili4n2"]}.
 % Do not monitor the hosts file
 {hosts_file, ""}.
 
